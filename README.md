@@ -16,6 +16,7 @@ end()
 
 ## EXAMPLE:
 ```
+darken(0.5)      # Optional - darkens the background
 start(4, 30, 30)
 vec3(1, 0, 0)
 BIG TITLE
@@ -43,6 +44,7 @@ end()
 <p>
 
 ```
+color.rgb = mix(color.rgb, vec3(0.0), 0.5);
 beginTextM(4, vec2(30, 30));
     text.fgCol = vec4(1.0, 0.0, 0.0, 1.0);
     printString((_B, _I, _G, _space, _T, _I, _T, _L, _E));
