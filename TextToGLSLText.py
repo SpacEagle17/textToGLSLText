@@ -1,11 +1,19 @@
 import re
 import os
 
+# Try to import pyperclip but don't fail if it's not available
+try:
+    import pyperclip
+    CLIPBOARD_AVAILABLE = True
+except ImportError:
+    CLIPBOARD_AVAILABLE = False
+
 '''
     INSTRUCTIONS:
     by @SpacEagle17
 
     1. Create a .txt file with the following format (can repeat multiple times)):
+    [darken(value)]  # Optional, first line only
     start(size, x, y)
     vec3(r, g, b)
     Text to convert
@@ -15,6 +23,7 @@ import os
 
     
     EXAMPLE:
+    darken(0.5)      # Optional - darkens the background
     start(4, 30, 30)
     vec3(1, 0, 0)
     BIG TITLE
@@ -44,6 +53,7 @@ import os
 
 
     COMMANDS:
+    - darken(value): Optional, first line only. Darkens the background. Default: 0.65
     - start(size, x, y): Start a new text section with size and position
     - vec3(r, g, b): Set the color for the text section - can be in vec3(1.0, 1.0, 1.0) or vec3(1, 1, 1) or vec3(1) format
     - end(): End the current text section
@@ -108,7 +118,8 @@ def validate_text(lines):
         is_command_line = (
             line.startswith('start(') or 
             line.startswith('vec3(') or 
-            line == 'end()'
+            line == 'end()' or
+            line.startswith('darken(')  # Add darken command
         )
         
         for char in line:
@@ -125,9 +136,29 @@ def parse_and_convert(input_text):
     current_pos = None
     in_section = False
     
+    # Check for darken() at the first line
+    if lines and lines[0].strip().startswith('darken('):
+        darken_match = re.match(r'darken\((\d+(?:\.\d+)?)\)', lines[0].strip())
+        if darken_match:
+            # Extract darkness value if provided
+            darkness = float(darken_match.group(1))
+            output.append(f'color.rgb = mix(color.rgb, vec3(0.0), {darkness});')
+        elif lines[0].strip() == 'darken()':
+            # Use default darkness value
+            output.append('color.rgb = mix(color.rgb, vec3(0.0), 0.65);')
+        else:
+            raise ValueError("Invalid darken() format. Use darken() or darken(value)")
+        
+        # Remove the first line as it's been processed
+        lines = lines[1:]
+    
     i = 0
     while i < len(lines):
         line = lines[i].strip()
+        
+        # Check for misplaced darken() command
+        if line.startswith('darken('):
+            raise ValueError(f"darken() command can only be used on the first line, found on line {i+1}")
         
         # Check for start command
         start_match = re.match(r'start\((\d+),\s*(\d+),\s*(\d+)\)', line)
@@ -179,6 +210,16 @@ def parse_and_convert(input_text):
     
     return '\n'.join(output)
 
+def copy_to_clipboard(text):
+    """Copy text to clipboard if pyperclip is available."""
+    if CLIPBOARD_AVAILABLE:
+        try:
+            pyperclip.copy(text)
+            return True
+        except Exception:
+            return False
+    return False
+
 def main():
     # Ask for file location and remove quotes
     file_path = input("Enter the path to the .txt file: ").strip().strip('"\'')
@@ -194,6 +235,14 @@ def main():
         # Print converted text to console
         print("\nConverted Text:")
         print(converted_text)
+        
+        # Try to copy to clipboard if available
+        if copy_to_clipboard(converted_text):
+            print("Converted text has been copied to clipboard.")
+        elif CLIPBOARD_AVAILABLE:
+            print("Could not copy to clipboard due to an error.")
+        else:
+            print("Clipboard functionality not available. Install pyperclip for this feature.")
         
         # Generate output file path
         base, ext = os.path.splitext(file_path)
