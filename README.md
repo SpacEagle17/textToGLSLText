@@ -84,6 +84,7 @@ endText(color.rgb);
 
 
 ## COMMANDS:
+- `darken(value)`: Optional, first line only. Darkens the background. Default: 0.65 - Allowed range: 0.0 to 1.0
 - `start(size, x, y)`: Start a new text section with size and position
 - `vec3(r, g, b)`: Set the color for the text section - can be in `vec3(1.0, 1.0, 1.0)` or `vec3(1, 1, 1)` or `vec3(1)` format
 - `end()`: End the current text section
