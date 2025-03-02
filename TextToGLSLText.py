@@ -11,54 +11,54 @@ except ImportError:
     CLIPBOARD_AVAILABLE = False
 
 '''
-    INSTRUCTIONS:
+INSTRUCTIONS:
 
-    1. Create a .txt file with the following format (can repeat multiple times)):
-    [darken(value)]  # Optional, first line only
-    start(size, x, y)
-    vec3(r, g, b)
-    Text to convert
-    end()
-    2. Run the script and enter the path to the .txt file when prompted
-    3. The converted text will be printed to the console, saved to a new file and copied to clipboard (if available)
-
-    
-    EXAMPLE:
-    darken(0.5)      # Optional - darkens the background
-    start(4, 30, 30)
-    vec3(1, 0, 0)
-    BIG TITLE
-    end()
-
-    start(2, 0, 80)
-    vec3(1.0, 1.0, 1.0)
-    Hello my name is XYZ.
-    I like potatoes, very much: ok!
-
-    vec3(1, 0, 0)
-    AAAAAAAAAAAAAAA
+1. Create a .txt file with the following format (can repeat multiple times)):
+[darken(value)]  # Optional, first line only
+start(size, x, y)
+vec3(r, g, b)
+Text to convert
+end()
+2. Run the script and enter the path to the .txt file when prompted
+3. The converted text will be printed to the console, saved to a new file and copied to clipboard (if available)
 
 
+EXAMPLE (can be copied for testing):
+darken(0.5)
+start(4, 30, 30)
+vec3(1, 0, 0)
+BIG TITLE
+end()
 
-    vec3(1)
-    This is a new paragraph
-    . -,:_"!<>[]()=+
-    vec3(1.0, 0.0, 1.0)
-    This text has a new color
-    end()
+start(2, 0, 80)
+vec3(1.0, 1.0, 1.0)
+Hello my name is XYZ.
+I like potatoes, very much: ok!
+
+vec3(1, 0, 0)
+AAAAAAAAAAAAAAA
 
 
-    ALLOWED CHARACTERS:
-    - Alphanumeric characters
-    - Space, ., -, ,, :, _, ", !, >, <, [, ], (, ), =, +
+
+vec3(1)
+This is a new paragraph
+. -,:_"!<>[]()=+
+vec3(1.0, 0.0, 1.0)
+This text has a new color
+end()
+END OF EXAMPLE
+
+ALLOWED CHARACTERS:
+- Alphanumeric characters
+- Space, ., -, ,, :, _, ", !, >, <, [, ], (, ), =, +
 
 
-    COMMANDS:
-    - darken(value): Optional, first line only. Darkens the background. Default: 0.65 - Allowed range: 0.0 to 1.0
-    - start(size, x, y): Start a new text section with size and position
-    - vec3(r, g, b): Set the color for the text section - can be in vec3(1.0, 1.0, 1.0) or vec3(1, 1, 1) or vec3(1) format
-    - end(): End the current text section
-    
+COMMANDS:
+- darken(value): Optional, first line only. Darkens the background. Default: 0.65 - Allowed range: 0.0 to 1.0
+- start(size, x, y): Start a new text section with size and position
+- vec3(r, g, b): Set the color for the text section - can be in vec3(1.0, 1.0, 1.0) or vec3(1, 1, 1) or vec3(1) format
+- end(): End the current text section
+
 '''
 
 # Constants
@@ -171,12 +171,17 @@ def process_darken_command(line: str) -> str:
         GLSL code string for the darken effect
         
     Raises:
-        ValueError: If the darken command format is invalid
+        ValueError: If the darken command format is invalid or value is out of range
     """
     darken_match = DARKEN_PATTERN.match(line.strip())
     if darken_match:
         # Extract darkness value if provided
         darkness = float(darken_match.group(1))
+        
+        # Validate range (0.0 to 1.0)
+        if darkness < 0.0 or darkness > 1.0:
+            raise ValueError(f"Darkness value must be between 0.0 and 1.0, got {darkness}")
+            
         return f'color.rgb = mix(color.rgb, vec3(0.0), {darkness});'
     elif line.strip() == 'darken()':
         # Use default darkness value
