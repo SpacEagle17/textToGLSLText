@@ -59,6 +59,27 @@ COMMANDS:
 - vec3(r, g, b): Set the color for the text section - can be in vec3(1.0, 1.0, 1.0) or vec3(1, 1, 1) or vec3(1) format
 - end(): End the current text section
 
+SHORTCUT COMMANDS:
+- Title([size, [x, y]]): Quick way to start a title section with default values: size=8, x=6, y=10
+- Text([size, [x, y]]): Quick way to start a text section with default values: size=4, x=15, y=36
+- Footnote([size, [x, y]]): Quick way to start a footnote section with default values: size=2, x=30, y=calculated
+  Note: Footnote() calculates y position based on the previous section when not specified.
+        Y = prev_section_y + (15 * number_of_lines_in_prev_section) + 36
+
+SHORTCUT EXAMPLE:
+darken(0.5)
+Title()
+This is a title with default settings
+end()
+
+Text(5, 10)  
+This is regular text with custom size and x position
+end()
+
+Footnote()
+This footnote will be positioned automatically based on the text above
+end()
+
 '''
 
 # Constants
@@ -66,10 +87,26 @@ DEFAULT_DARKNESS = 0.65
 EMPTY_LINE_RESULT = '    printLine();'
 SECTION_END_RESULT = 'endText(color.rgb);'
 
+# Default values for shortcut commands
+TITLE_DEFAULT_SIZE = 8
+TITLE_DEFAULT_X = 6
+TITLE_DEFAULT_Y = 10
+
+TEXT_DEFAULT_SIZE = 4
+TEXT_DEFAULT_X = 15
+TEXT_DEFAULT_Y = 36
+
+FOOTNOTE_DEFAULT_SIZE = 2
+FOOTNOTE_DEFAULT_X = 30
+# FOOTNOTE_DEFAULT_Y is calculated dynamically
+
 # Compiled regex patterns for better performance
 START_PATTERN = re.compile(r'start\((\d+),\s*(\d+),\s*(\d+)\)')
 COLOR_PATTERN = re.compile(r'vec3\((\d+(?:\.\d+)?)\s*(?:,\s*(\d+(?:\.\d+)?)\s*(?:,\s*(\d+(?:\.\d+)?))?)?\)')
 DARKEN_PATTERN = re.compile(r'darken\((\d+(?:\.\d+)?)\)')
+TITLE_PATTERN = re.compile(r'Title\((?:(\d+)(?:,\s*(\d+)(?:,\s*(\d+))?)?)?\)')
+TEXT_PATTERN = re.compile(r'Text\((?:(\d+)(?:,\s*(\d+)(?:,\s*(\d+))?)?)?\)')
+FOOTNOTE_PATTERN = re.compile(r'Footnote\((?:(\d+)(?:,\s*(\d+)(?:,\s*(\d+))?)?)?\)')
 
 # Special character mapping
 SPECIAL_CHARS: Dict[str, str] = {
@@ -153,7 +190,10 @@ def validate_text(lines: List[str]) -> None:
             line.startswith('start(') or 
             line.startswith('vec3(') or 
             line == 'end()' or
-            line.startswith('darken(')
+            line.startswith('darken(') or
+            line.startswith('Title(') or
+            line.startswith('Text(') or
+            line.startswith('Footnote(')
         )
         
         for char in line:
@@ -225,6 +265,69 @@ def process_color_command(line: str) -> Optional[str]:
         return f'    text.fgCol = vec4({r}, {g}, {b}, 1.0);'
     return None
 
+def process_title_command(line: str) -> Optional[str]:
+    """
+    Process Title() command and return corresponding GLSL code with default values.
+    
+    Args:
+        line: The Title command line
+        
+    Returns:
+        GLSL code string for the Title command or None if not a valid command
+    """
+    title_match = TITLE_PATTERN.match(line)
+    if title_match:
+        size = int(title_match.group(1)) if title_match.group(1) else TITLE_DEFAULT_SIZE
+        pos_x = int(title_match.group(2)) if title_match.group(2) else TITLE_DEFAULT_X
+        pos_y = int(title_match.group(3)) if title_match.group(3) else TITLE_DEFAULT_Y
+        return f'beginTextM({size}, vec2({pos_x}, {pos_y}));'
+    return None
+
+def process_text_command(line: str) -> Optional[str]:
+    """
+    Process Text() command and return corresponding GLSL code with default values.
+    
+    Args:
+        line: The Text command line
+        
+    Returns:
+        GLSL code string for the Text command or None if not a valid command
+    """
+    text_match = TEXT_PATTERN.match(line)
+    if text_match:
+        size = int(text_match.group(1)) if text_match.group(1) else TEXT_DEFAULT_SIZE
+        pos_x = int(text_match.group(2)) if text_match.group(2) else TEXT_DEFAULT_X
+        pos_y = int(text_match.group(3)) if text_match.group(3) else TEXT_DEFAULT_Y
+        return f'beginTextM({size}, vec2({pos_x}, {pos_y}));'
+    return None
+
+def process_footnote_command(line: str, prev_y: int, line_count: int) -> Optional[str]:
+    """
+    Process Footnote() command and return corresponding GLSL code.
+    Y position is calculated based on previous section if not specified.
+    
+    Args:
+        line: The Footnote command line
+        prev_y: Y position of the previous text section
+        line_count: Number of printLine() calls in the previous text section
+        
+    Returns:
+        GLSL code string for the Footnote command or None if not a valid command
+    """
+    footnote_match = FOOTNOTE_PATTERN.match(line)
+    if footnote_match:
+        size = int(footnote_match.group(1)) if footnote_match.group(1) else FOOTNOTE_DEFAULT_SIZE
+        pos_x = int(footnote_match.group(2)) if footnote_match.group(2) else FOOTNOTE_DEFAULT_X
+        
+        # If y is specified in the command, use that, otherwise calculate based on previous section
+        if footnote_match.group(3):
+            pos_y = int(footnote_match.group(3))
+        else:
+            pos_y = prev_y + (15 * line_count) + 36
+            
+        return f'beginTextM({size}, vec2({pos_x}, {pos_y}));'
+    return None
+
 def process_text_line(line: str) -> Union[str, List[str]]:
     """
     Process a text line and return corresponding GLSL code.
@@ -262,6 +365,8 @@ def parse_and_convert(input_text: str) -> str:
     
     output = []
     in_section = False
+    prev_y = 0  # Track previous section's y value
+    line_count = 0  # Track number of printLine() calls in current section
     
     # Check for darken() at the first line
     if lines and lines[0].strip().startswith('darken('):
@@ -277,11 +382,50 @@ def parse_and_convert(input_text: str) -> str:
         if line.startswith('darken('):
             raise ValueError(f"darken() command can only be used on the first line, found on line {i+1}")
         
-        # Check for start command
-        start_result = process_start_command(line)
+        # Reset line count if we're starting a new section
+        if line == 'end()':
+            output.append(SECTION_END_RESULT)
+            in_section = False
+            i += 1
+            continue
+        
+        # Check for start command or shortcut commands
+        start_result = None
+        current_y = 0  # To track position for this section
+        
+        # Try each type of section start command
+        if not start_result:
+            start_result = process_start_command(line)
+            if start_result:
+                match = START_PATTERN.match(line)
+                current_y = int(match.group(3))
+        
+        if not start_result:
+            start_result = process_title_command(line)
+            if start_result:
+                match = TITLE_PATTERN.match(line)
+                current_y = int(match.group(3)) if match.group(3) else TITLE_DEFAULT_Y
+        
+        if not start_result:
+            start_result = process_text_command(line)
+            if start_result:
+                match = TEXT_PATTERN.match(line)
+                current_y = int(match.group(3)) if match.group(3) else TEXT_DEFAULT_Y
+        
+        if not start_result:
+            start_result = process_footnote_command(line, prev_y, line_count)
+            if start_result:
+                match = FOOTNOTE_PATTERN.match(line)
+                if match and match.group(3):
+                    current_y = int(match.group(3))
+                else:
+                    current_y = prev_y + (15 * line_count) + 36
+        
         if start_result:
             output.append(start_result)
             in_section = True
+            prev_y = current_y  # Store for next section
+            line_count = 0  # Reset line count for new section
             i += 1
             continue
         
@@ -292,27 +436,25 @@ def parse_and_convert(input_text: str) -> str:
             i += 1
             continue
         
-        # End command
-        if line == 'end()':
-            output.append(SECTION_END_RESULT)
-            in_section = False
-            i += 1
-            continue
-        
-        # Validate text placement
-        if line and not start_result and not color_result:
-            if not in_section:
-                raise ValueError(f"Text found outside of section boundaries on line {i+1}")
-            
-            # Process text line
-            text_results = process_text_line(line)
-            if isinstance(text_results, list):
-                output.extend(text_results)
+        # Process text lines and empty lines
+        if in_section:
+            if line:
+                # Process text line
+                text_results = process_text_line(line)
+                if isinstance(text_results, list):
+                    output.extend(text_results)
+                    line_count += 1  # Count the printLine() at the end of text line
+                else:
+                    output.append(text_results)
+                    if text_results == EMPTY_LINE_RESULT:
+                        line_count += 1
             else:
-                output.append(text_results)
-        elif not line and in_section:
-            # Empty line - add printLine() only within a section
-            output.append(EMPTY_LINE_RESULT)
+                # Empty line - add printLine() only within a section
+                output.append(EMPTY_LINE_RESULT)
+                line_count += 1
+        elif line:
+            # Text outside a section
+            raise ValueError(f"Text found outside of section boundaries on line {i+1}")
         
         i += 1
     

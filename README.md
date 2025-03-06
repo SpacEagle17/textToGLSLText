@@ -88,3 +88,26 @@ endText(color.rgb);
 - `start(size, x, y)`: Start a new text section with size and position
 - `vec3(r, g, b)`: Set the color for the text section - can be in `vec3(1.0, 1.0, 1.0)` or `vec3(1, 1, 1)` or `vec3(1)` format
 - `end()`: End the current text section
+
+## SHORTCUT COMMANDS:
+- `Title([size, [x, y]])`: Quick way to start a title section with default values: size=8, x=6, y=10
+- `Text([size, [x, y]])`: Quick way to start a text section with default values: size=4, x=15, y=36
+- `Footnote([size, [x, y]])`: Quick way to start a footnote section with default values: size=2, x=30, y=calculated
+  Note: `Footnote()` calculates y position based on the previous section when not specified.
+        `Y = prev_section_y + (15 * number_of_lines_in_prev_section) + 36`
+
+## SHORTCUT EXAMPLE:
+```
+darken(0.5)
+Title()
+This is a title with default settings
+end()
+
+Text(5, 10)  
+This is regular text with custom size and x position
+end()
+
+Footnote()
+This footnote will be positioned automatically based on the text above
+end()
+```
