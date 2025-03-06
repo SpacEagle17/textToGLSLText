@@ -60,6 +60,7 @@ COMMANDS:
 - end(): End the current text section
 
 SHORTCUT COMMANDS:
+They are optional replacements for start()
 - Title([size, [x, y]]): Quick way to start a title section with default values: size=8, x=6, y=10
 - Text([size, [x, y]]): Quick way to start a text section with default values: size=4, x=15, y=36
 - Footnote([size, [x, y]]): Quick way to start a footnote section with default values: size=2, x=30, y=calculated
