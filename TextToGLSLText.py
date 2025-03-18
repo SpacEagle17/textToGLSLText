@@ -50,7 +50,9 @@ END OF EXAMPLE
 
 ALLOWED CHARACTERS:
 - Alphanumeric characters
-- Space, ., -, ,, :, _, ", !, >, <, [, ], (, ), =, +
+- Space, ., -, ,, :, _, ", !, >, <, [, ], (, ), =, +, /
+
++ and / are Euphoria Patches Exclusive
 
 
 COMMANDS:
@@ -128,7 +130,8 @@ SPECIAL_CHARS: Dict[str, str] = {
     'dot': '_dot',
     'minus': '_minus',
     'comma': '_comma',
-    'colon': '_colon'
+    'colon': '_colon',
+    'slash': '_slash'
 }
 
 # Reverse mapping for quick lookup
@@ -137,7 +140,7 @@ CHAR_TO_SPECIAL: Dict[str, str] = {
     ':': 'colon', '_': 'under', '"': 'quote', '!': 'exclm', 
     '>': 'gt', '<': 'lt', '[': 'opsqr', ']': 'clsqr', 
     '(': 'opprn', ')': 'clprn', '█': 'block', '©': 'copyr', 
-    '=': 'equal', '+': 'plus'
+    '=': 'equal', '+': 'plus', '/': 'slash'
 }
 
 def is_valid_char(char: str, is_command_line: bool = False) -> bool:

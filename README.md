@@ -80,7 +80,9 @@ endText(color.rgb);
 
 ## ALLOWED CHARACTERS:
 - Alphanumeric characters
-- Space, ., -, ,, :, _, ", !, >, <, [, ], (, ), =, +
+- Space, ., -, ,, :, _, ", !, >, <, [, ], (, ), =, +, /
+
+`+ and / are Euphoria Patches Exclusive`
 
 
 ## COMMANDS:
