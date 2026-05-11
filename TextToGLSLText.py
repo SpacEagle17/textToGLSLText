@@ -54,6 +54,7 @@ ALLOWED CHARACTERS:
 
 + and / are Euphoria Patches Exclusive
 
+Lines starting with # are treated as comments and ignored during conversion.
 
 COMMANDS:
 - darken(value): Optional, first line only. Darkens the background. Default: 0.65 - Allowed range: 0.0 to 1.0
@@ -75,7 +76,7 @@ Title()
 This is a title with default settings
 end()
 
-Text(5, 10)  
+Text(5, 10)
 This is regular text with custom size and x position
 end()
 
@@ -124,7 +125,7 @@ SPECIAL_CHARS: Dict[str, str] = {
     'opprn': '_opprn',
     'clprn': '_clprn',
     'block': '_block',
-    'copyr': '_copyr', 
+    'copyr': '_copyr',
     'equal': '_equal',
     'plus': '_plus',
     'dot': '_dot',
@@ -136,35 +137,35 @@ SPECIAL_CHARS: Dict[str, str] = {
 
 # Reverse mapping for quick lookup
 CHAR_TO_SPECIAL: Dict[str, str] = {
-    ' ': 'space', '.': 'dot', '-': 'minus', ',': 'comma', 
-    ':': 'colon', '_': 'under', '"': 'quote', '!': 'exclm', 
-    '>': 'gt', '<': 'lt', '[': 'opsqr', ']': 'clsqr', 
-    '(': 'opprn', ')': 'clprn', '█': 'block', '©': 'copyr', 
+    ' ': 'space', '.': 'dot', '-': 'minus', ',': 'comma',
+    ':': 'colon', '_': 'under', '"': 'quote', '!': 'exclm',
+    '>': 'gt', '<': 'lt', '[': 'opsqr', ']': 'clsqr',
+    '(': 'opprn', ')': 'clprn', '█': 'block', '©': 'copyr',
     '=': 'equal', '+': 'plus', '/': 'slash'
 }
 
 def is_valid_char(char: str, is_command_line: bool = False) -> bool:
     """
     Check if character is allowed in the input text.
-    
+
     Args:
         char: The character to check
         is_command_line: Whether the character is part of a command line
-        
+
     Returns:
         True if the character is valid, False otherwise
     """
-    return (char.isalnum() or 
-            char in CHAR_TO_SPECIAL or 
+    return (char.isalnum() or
+            char in CHAR_TO_SPECIAL or
             (is_command_line and char in '()'))
 
 def convert_to_chars(text: str) -> List[str]:
     """
     Convert text to character identifiers used in the GLSL output.
-    
+
     Args:
         text: The text to convert
-        
+
     Returns:
         A list of character identifiers
     """
@@ -181,25 +182,29 @@ def convert_to_chars(text: str) -> List[str]:
 def validate_text(lines: List[str]) -> None:
     """
     Validate input text for allowed characters and proper structure.
-    
+
     Args:
         lines: List of text lines to validate
-        
+
     Raises:
         ValueError: If invalid characters or structure is found
     """
     for line_num, line in enumerate(lines, 1):
+        # Skip comment lines that start with '#'
+        if line.strip().startswith('#'):
+            continue
+
         # Check if the line is a command line
         is_command_line = (
-            line.startswith('start(') or 
-            line.startswith('vec3(') or 
+            line.startswith('start(') or
+            line.startswith('vec3(') or
             line == 'end()' or
             line.startswith('darken(') or
             line.startswith('Title(') or
             line.startswith('Text(') or
             line.startswith('Footnote(')
         )
-        
+
         for char in line:
             if not is_valid_char(char, is_command_line):
                 raise ValueError(f"Illegal character '{char}' found on line {line_num}")
@@ -207,13 +212,13 @@ def validate_text(lines: List[str]) -> None:
 def process_darken_command(line: str) -> str:
     """
     Process darken() command and return corresponding GLSL code.
-    
+
     Args:
         line: The darken command line
-        
+
     Returns:
         GLSL code string for the darken effect
-        
+
     Raises:
         ValueError: If the darken command format is invalid or value is out of range
     """
@@ -221,11 +226,11 @@ def process_darken_command(line: str) -> str:
     if darken_match:
         # Extract darkness value if provided
         darkness = float(darken_match.group(1))
-        
+
         # Validate range (0.0 to 1.0)
         if darkness < 0.0 or darkness > 1.0:
             raise ValueError(f"Darkness value must be between 0.0 and 1.0, got {darkness}")
-            
+
         return f'color.rgb = mix(color.rgb, vec3(0.0), {darkness});'
     elif line.strip() == 'darken()':
         # Use default darkness value
@@ -236,10 +241,10 @@ def process_darken_command(line: str) -> str:
 def process_start_command(line: str) -> Optional[str]:
     """
     Process start() command and return corresponding GLSL code.
-    
+
     Args:
         line: The start command line
-        
+
     Returns:
         GLSL code string for the start command or None if not a valid start command
     """
@@ -254,10 +259,10 @@ def process_start_command(line: str) -> Optional[str]:
 def process_color_command(line: str) -> Optional[str]:
     """
     Process vec3() command and return corresponding GLSL code.
-    
+
     Args:
         line: The vec3 color command line
-        
+
     Returns:
         GLSL code string for the color setting or None if not a valid color command
     """
@@ -272,10 +277,10 @@ def process_color_command(line: str) -> Optional[str]:
 def process_title_command(line: str) -> Optional[str]:
     """
     Process Title() command and return corresponding GLSL code with default values.
-    
+
     Args:
         line: The Title command line
-        
+
     Returns:
         GLSL code string for the Title command or None if not a valid command
     """
@@ -290,10 +295,10 @@ def process_title_command(line: str) -> Optional[str]:
 def process_text_command(line: str) -> Optional[str]:
     """
     Process Text() command and return corresponding GLSL code with default values.
-    
+
     Args:
         line: The Text command line
-        
+
     Returns:
         GLSL code string for the Text command or None if not a valid command
     """
@@ -309,12 +314,12 @@ def process_footnote_command(line: str, prev_y: int, line_count: int) -> Optiona
     """
     Process Footnote() command and return corresponding GLSL code.
     Y position is calculated based on previous section if not specified.
-    
+
     Args:
         line: The Footnote command line
         prev_y: Y position of the previous text section
         line_count: Number of printLine() calls in the previous text section
-        
+
     Returns:
         GLSL code string for the Footnote command or None if not a valid command
     """
@@ -322,29 +327,29 @@ def process_footnote_command(line: str, prev_y: int, line_count: int) -> Optiona
     if footnote_match:
         size = int(footnote_match.group(1)) if footnote_match.group(1) else FOOTNOTE_DEFAULT_SIZE
         pos_x = int(footnote_match.group(2)) if footnote_match.group(2) else FOOTNOTE_DEFAULT_X
-        
+
         # If y is specified in the command, use that, otherwise calculate based on previous section
         if footnote_match.group(3):
             pos_y = int(footnote_match.group(3))
         else:
             pos_y = prev_y + (15 * line_count) + 36
-            
+
         return f'beginTextM({size}, vec2({pos_x}, {pos_y}));'
     return None
 
 def process_text_line(line: str) -> Union[str, List[str]]:
     """
     Process a text line and return corresponding GLSL code.
-    
+
     Args:
         line: The text line to process
-        
+
     Returns:
         GLSL code string or list of strings for the text line
     """
     if not line:
         return EMPTY_LINE_RESULT
-    
+
     char_identifiers = convert_to_chars(line)
     return [
         f'    printString(({", ".join(char_identifiers)}));',
@@ -354,68 +359,70 @@ def process_text_line(line: str) -> Union[str, List[str]]:
 def parse_and_convert(input_text: str) -> str:
     """
     Parse the input text and convert to GLSL format.
-    
+
     Args:
         input_text: The raw input text to convert
-        
+
     Returns:
         Converted GLSL code as a string
-        
+
     Raises:
         ValueError: If the input text has invalid format or structure
     """
-    lines = input_text.split('\n')
+    raw_lines = input_text.split('\n')
+    # Remove comment lines (lines starting with '#') before validation/parsing
+    lines = [ln for ln in raw_lines if not ln.strip().startswith('#')]
     validate_text(lines)
-    
+
     output = []
     in_section = False
     prev_y = 0  # Track previous section's y value
     line_count = 0  # Track number of printLine() calls in current section
-    
-    # Check for darken() at the first line
+
+    # Check for darken() at the first non-comment line
     if lines and lines[0].strip().startswith('darken('):
         output.append(process_darken_command(lines[0]))
         # Remove the first line as it's been processed
         lines = lines[1:]
-    
+
     i = 0
     while i < len(lines):
         line = lines[i].strip()
-        
+
         # Check for misplaced darken() command
         if line.startswith('darken('):
             raise ValueError(f"darken() command can only be used on the first line, found on line {i+1}")
-        
+
         # Reset line count if we're starting a new section
         if line == 'end()':
             output.append(SECTION_END_RESULT)
             in_section = False
             i += 1
             continue
-        
+
         # Check for start command or shortcut commands
         start_result = None
         current_y = 0  # To track position for this section
-        
+
         # Try each type of section start command
         if not start_result:
             start_result = process_start_command(line)
             if start_result:
                 match = START_PATTERN.match(line)
                 current_y = int(match.group(3))
-        
+
         if not start_result:
             start_result = process_title_command(line)
             if start_result:
                 match = TITLE_PATTERN.match(line)
                 current_y = int(match.group(3)) if match.group(3) else TITLE_DEFAULT_Y
-        
+
         if not start_result:
             start_result = process_text_command(line)
             if start_result:
                 match = TEXT_PATTERN.match(line)
                 current_y = int(match.group(3)) if match.group(3) else TEXT_DEFAULT_Y
-        
+
         if not start_result:
             start_result = process_footnote_command(line, prev_y, line_count)
             if start_result:
@@ -424,7 +431,7 @@ def parse_and_convert(input_text: str) -> str:
                     current_y = int(match.group(3))
                 else:
                     current_y = prev_y + (15 * line_count) + 36
-        
+
         if start_result:
             output.append(start_result)
             in_section = True
@@ -432,14 +439,14 @@ def parse_and_convert(input_text: str) -> str:
             line_count = 0  # Reset line count for new section
             i += 1
             continue
-        
+
         # Check for vec3 color command
         color_result = process_color_command(line)
         if color_result and in_section:
             output.append(color_result)
             i += 1
             continue
-        
+
         # Process text lines and empty lines
         if in_section:
             if line:
@@ -459,22 +466,22 @@ def parse_and_convert(input_text: str) -> str:
         elif line:
             # Text outside a section
             raise ValueError(f"Text found outside of section boundaries on line {i+1}")
-        
+
         i += 1
-    
+
     # Validate no open sections
     if in_section:
         raise ValueError("Unclosed section: missing end() command")
-    
+
     return '\n'.join(output)
 
 def copy_to_clipboard(text: str) -> bool:
     """
     Copy text to clipboard if pyperclip is available.
-    
+
     Args:
         text: The text to copy to clipboard
-        
+
     Returns:
         True if successfully copied, False otherwise
     """
@@ -494,32 +501,32 @@ def main() -> None:
     print("  TEXT TO GLSL CONVERTER FOR COMPLEMENTARY SHADERS")
     print("  by @SpacEagle17")
     print("="*60)
-    
+
     # Ask for file location and remove quotes
     file_path = input("\nEnter the path to the .txt file: ").strip().strip('"\'')
-    
+
     try:
         # Read input file
         with open(file_path, 'r') as file:
             input_text = file.read()
-        
+
         # Convert text
         converted_text = parse_and_convert(input_text)
-        
+
         # Print converted text to console with nice formatting
         print("\n" + "="*60)
         print("CONVERTED TEXT:")
         print("="*60)
         print(converted_text)
-        
+
         # Generate output file path
         base, ext = os.path.splitext(file_path)
         output_path = f"{base}_converted{ext}"
-        
+
         # Write converted text to new file
         with open(output_path, 'w') as file:
             file.write(converted_text)
-        
+
         # Summary
         print("\n" + "="*60)
         print("SUMMARY:")
@@ -536,16 +543,16 @@ def main() -> None:
 
         print(f"  Text length: {len(converted_text)} characters")
         print("="*60)
-    
+
     except FileNotFoundError:
         print("\nERROR: File not found!")
         print(f"Could not find file at: {file_path}")
         print("Please check the path and try again.")
-    
+
     except ValueError as e:
         print("\nERROR: Invalid input format!")
         print(f"{e}")
-    
+
     except Exception as e:
         print("\nERROR: Unexpected error!")
         print(f"{e}")

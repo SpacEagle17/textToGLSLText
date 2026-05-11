@@ -73,7 +73,7 @@ beginTextM(2, vec2(0, 80));
     printLine();
 endText(color.rgb);
 ```
-  
+
 </p>
 </details>
 
@@ -83,6 +83,8 @@ endText(color.rgb);
 - Space, ., -, ,, :, _, ", !, >, <, [, ], (, ), =, +, /
 
 `+ and / are Euphoria Patches Exclusive`
+
+Lines starting with # are treated as comments and ignored during conversion.
 
 
 ## COMMANDS:
@@ -106,7 +108,7 @@ Title()
 This is a title with default settings
 end()
 
-Text(5, 10)  
+Text(5, 10)
 This is regular text with custom size and x position
 end()
 
