@@ -379,11 +379,12 @@ def parse_and_convert(input_text: str) -> str:
     prev_y = 0  # Track previous section's y value
     line_count = 0  # Track number of printLine() calls in current section
 
-    # Check for darken() at the first non-comment line
-    if lines and lines[0].strip().startswith('darken('):
-        output.append(process_darken_command(lines[0]))
-        # Remove the first line as it's been processed
-        lines = lines[1:]
+    # Check for darken() at the first non-comment, non-blank line
+    first_idx = next((idx for idx, ln in enumerate(lines) if ln.strip()), None)
+    if first_idx is not None and lines[first_idx].strip().startswith('darken('):
+        output.append(process_darken_command(lines[first_idx]))
+        # Remove everything up to and including the darken line
+        lines = lines[first_idx + 1:]
 
     i = 0
     while i < len(lines):
