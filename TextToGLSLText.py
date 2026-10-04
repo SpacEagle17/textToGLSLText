@@ -65,10 +65,11 @@ COMMANDS:
 SHORTCUT COMMANDS:
 They are optional replacements for start()
 - Title([size, [x, y]]): Quick way to start a title section with default values: size=8, x=6, y=10
-- Text([size, [x, y]]): Quick way to start a text section with default values: size=4, x=15, y=36
+- Text([size, [x, y]]): Quick way to start a text section with default values: size=4, x=15, y=calculated
 - Footnote([size, [x, y]]): Quick way to start a footnote section with default values: size=2, x=30, y=calculated
-  Note: Footnote() calculates y position based on the previous section when not specified.
-        Y = prev_section_y + (15 * number_of_lines_in_prev_section) + 36
+  Note: Text() and Footnote() calculate their y position from the bottom of the previous section
+        when y is not specified, so multi-line titles don't overlap.
+        If there is no previous section, Text() uses y=36 and Footnote() uses y=36.
 
 SHORTCUT EXAMPLE:
 darken(0.5)
@@ -98,11 +99,17 @@ TITLE_DEFAULT_Y = 10
 
 TEXT_DEFAULT_SIZE = 4
 TEXT_DEFAULT_X = 15
-TEXT_DEFAULT_Y = 36
+TEXT_DEFAULT_Y = 36  # Used when there is no previous section
 
 FOOTNOTE_DEFAULT_SIZE = 2
 FOOTNOTE_DEFAULT_X = 30
-# FOOTNOTE_DEFAULT_Y is calculated dynamically
+FOOTNOTE_DEFAULT_Y = 36  # Used when there is no previous section
+
+# Layout (from textRenderer.glsl): a line is 7 grid cells tall (6 char height + 1 line spacing)
+# and one grid cell is `size` screen pixels, so a section is 7 * size * lines pixels tall.
+LINE_HEIGHT_CELLS = 7
+SECTION_GAP_PX = 8
+BEGIN_TEXT_PATTERN = re.compile(r'beginTextM\((\d+), vec2\((\d+), (\d+)\)\)')
 
 # Compiled regex patterns for better performance
 START_PATTERN = re.compile(r'start\((\d+),\s*(\d+),\s*(\d+)\)')
@@ -292,12 +299,19 @@ def process_title_command(line: str) -> Optional[str]:
         return f'beginTextM({size}, vec2({pos_x}, {pos_y}));'
     return None
 
-def process_text_command(line: str) -> Optional[str]:
+def auto_y(prev_bottom_px: Optional[int], size: int, default_y: int) -> int:
+    """Y position (in cells of `size`) that places a section just below the previous one."""
+    if prev_bottom_px is None:
+        return default_y
+    return -(-(prev_bottom_px + SECTION_GAP_PX) // size)  # ceil division
+
+def process_text_command(line: str, prev_bottom_px: Optional[int] = None) -> Optional[str]:
     """
     Process Text() command and return corresponding GLSL code with default values.
 
     Args:
         line: The Text command line
+        prev_bottom_px: Bottom edge of the previous section in pixels, or None if there is none
 
     Returns:
         GLSL code string for the Text command or None if not a valid command
@@ -306,19 +320,18 @@ def process_text_command(line: str) -> Optional[str]:
     if text_match:
         size = int(text_match.group(1)) if text_match.group(1) else TEXT_DEFAULT_SIZE
         pos_x = int(text_match.group(2)) if text_match.group(2) else TEXT_DEFAULT_X
-        pos_y = int(text_match.group(3)) if text_match.group(3) else TEXT_DEFAULT_Y
+        pos_y = int(text_match.group(3)) if text_match.group(3) else auto_y(prev_bottom_px, size, TEXT_DEFAULT_Y)
         return f'beginTextM({size}, vec2({pos_x}, {pos_y}));'
     return None
 
-def process_footnote_command(line: str, prev_y: int, line_count: int) -> Optional[str]:
+def process_footnote_command(line: str, prev_bottom_px: Optional[int] = None) -> Optional[str]:
     """
     Process Footnote() command and return corresponding GLSL code.
     Y position is calculated based on previous section if not specified.
 
     Args:
         line: The Footnote command line
-        prev_y: Y position of the previous text section
-        line_count: Number of printLine() calls in the previous text section
+        prev_bottom_px: Bottom edge of the previous section in pixels, or None if there is none
 
     Returns:
         GLSL code string for the Footnote command or None if not a valid command
@@ -332,7 +345,7 @@ def process_footnote_command(line: str, prev_y: int, line_count: int) -> Optiona
         if footnote_match.group(3):
             pos_y = int(footnote_match.group(3))
         else:
-            pos_y = prev_y + (15 * line_count) + 36
+            pos_y = auto_y(prev_bottom_px, size, FOOTNOTE_DEFAULT_Y)
 
         return f'beginTextM({size}, vec2({pos_x}, {pos_y}));'
     return None
@@ -377,6 +390,7 @@ def parse_and_convert(input_text: str) -> str:
     output = []
     in_section = False
     prev_y = 0  # Track previous section's y value
+    prev_size: Optional[int] = None  # Track previous section's text size (None before the first section)
     line_count = 0  # Track number of printLine() calls in current section
 
     # Check for darken() at the first non-comment, non-blank line
@@ -402,41 +416,23 @@ def parse_and_convert(input_text: str) -> str:
             continue
 
         # Check for start command or shortcut commands
-        start_result = None
-        current_y = 0  # To track position for this section
+        prev_bottom_px = None
+        if prev_size is not None:
+            prev_bottom_px = prev_y * prev_size + LINE_HEIGHT_CELLS * prev_size * line_count
 
-        # Try each type of section start command
-        if not start_result:
-            start_result = process_start_command(line)
-            if start_result:
-                match = START_PATTERN.match(line)
-                current_y = int(match.group(3))
-
-        if not start_result:
-            start_result = process_title_command(line)
-            if start_result:
-                match = TITLE_PATTERN.match(line)
-                current_y = int(match.group(3)) if match.group(3) else TITLE_DEFAULT_Y
-
-        if not start_result:
-            start_result = process_text_command(line)
-            if start_result:
-                match = TEXT_PATTERN.match(line)
-                current_y = int(match.group(3)) if match.group(3) else TEXT_DEFAULT_Y
-
-        if not start_result:
-            start_result = process_footnote_command(line, prev_y, line_count)
-            if start_result:
-                match = FOOTNOTE_PATTERN.match(line)
-                if match and match.group(3):
-                    current_y = int(match.group(3))
-                else:
-                    current_y = prev_y + (15 * line_count) + 36
+        start_result = (
+            process_start_command(line)
+            or process_title_command(line)
+            or process_text_command(line, prev_bottom_px)
+            or process_footnote_command(line, prev_bottom_px)
+        )
 
         if start_result:
             output.append(start_result)
             in_section = True
-            prev_y = current_y  # Store for next section
+            begin = BEGIN_TEXT_PATTERN.match(start_result)
+            prev_size = int(begin.group(1))
+            prev_y = int(begin.group(3))  # Store for next section
             line_count = 0  # Reset line count for new section
             i += 1
             continue
